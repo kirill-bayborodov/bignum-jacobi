@@ -1,4 +1,54 @@
 BITS 64
+; /**
+;  * @file bignum_jacobi.asm
+;  * @brief System V AMD64 implementation of the public Jacobi-symbol API.
+;  * @details
+;  * This file implements bignum_jacobi() and its private binary-reduction
+;  * helper. The algorithm accepts non-negative little-endian bignum_t values,
+;  * removes powers of two from the numerator, applies the supplementary law
+;  * for 2 and quadratic reciprocity, and reduces by binary long division.
+;  *
+;  * C/ASM boundary (Linux x86-64, System V AMD64 ABI):
+;  *   RDI = const bignum_t *a      (borrowed input numerator)
+;  *   RSI = const bignum_t *n      (borrowed input positive odd modulus)
+;  *   RDX = int *symbol            (caller-allocated output)
+;  *   EAX = bignum_jacobi_status_t return value
+;  * bignum_t is represented as 32 little-endian uint64_t words at byte offset
+;  * 0, followed by uint64_t len at byte offset 256. len is normalized and is
+;  * in the inclusive range 0..BIGNUM_CAPACITY. The output is written only on
+;  * successful validation and receives -1, 0, or 1.
+;  *
+;  * Register contract:
+;  *   Preserved: RBX, RBP, R12, R13. These are saved/restored by the public
+;  *   entry point and by jacobi_reduce when it is called internally.
+;  *   Caller-saved/clobbered: RAX, RCX, RDX, RSI, RDI, R8, R9, R10, R11.
+;  *   RDX is used as the output pointer after entry; no condition flags are
+;  *   part of the public interface. XMM/YMM state is not used or modified.
+;  *
+;  * Stack frame:
+;  *   The entry RSP is 8 mod 16. Four pushes save RBX/RBP/R12/R13 and the
+;  *   public function reserves 1096 bytes; consequently RSP is 0 mod 16
+;  *   immediately before every CALL, as required by the ABI.
+;  *   After allocation, the public frame uses:
+;  *     [rsp+0x000 .. rsp+0x107]  local copy of a (33 qwords)
+;  *     [rsp+0x110 .. rsp+0x217]  mutable numerator state
+;  *     [rsp+0x220 .. rsp+0x327]  mutable modulus state
+;  *     [rsp+0x330 .. rsp+0x437]  swap temporary state
+;  *   The final 16 bytes of the reserved area maintain frame separation; saved
+;  *   callee-saved registers are above the allocated frame.
+;  *
+;  * Error semantics: NULL pointers return BIGNUM_JACOBI_ERROR_NULL_ARG;
+;  * zero/even modulus returns BIGNUM_JACOBI_ERROR_MODULUS; all error paths
+;  * leave the caller-owned output unchanged. The implementation allocates no
+;  * heap memory and is reentrant/thread-safe for independently owned inputs.
+;  *
+;  * The private jacobi_reduce helper receives RDI=x and RSI=m, where both are
+;  * writable local bignum_t states. It preserves the same callee-saved
+;  * registers, uses a stack-local 33-word remainder, and writes the reduced
+;  * value back to x. It is not a public ABI symbol.
+;  */
+
+BITS 64
 DEFAULT REL
 
 jacobi_reduce:
