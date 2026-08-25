@@ -39,6 +39,19 @@ int main(void)
     expect(9U, 13U, 1);
     expect(1001U, 9907U, -1);
     expect(UINT64_C(0x1000000000000001), UINT64_C(0x1000000000000007), -1);
+    {
+        bignum_t a256 = value(5U), n3 = value(3U);
+        bignum_t a512 = value(1U);
+        int multiword_symbol = 91;
+        a256.len = 5U;
+        a256.words[4] = UINT64_C(1);
+        assert(bignum_jacobi(&a256, &n3, &multiword_symbol) == BIGNUM_JACOBI_SUCCESS);
+        assert(multiword_symbol == 0);
+        a512.len = 9U;
+        a512.words[8] = UINT64_C(1);
+        assert(bignum_jacobi(&a512, &n3, &multiword_symbol) == BIGNUM_JACOBI_SUCCESS);
+        assert(multiword_symbol == -1);
+    }
     assert(bignum_jacobi(NULL, &n, &symbol) == BIGNUM_JACOBI_ERROR_NULL_ARG);
     assert(bignum_jacobi(&a, NULL, &symbol) == BIGNUM_JACOBI_ERROR_NULL_ARG);
     assert(bignum_jacobi(&a, &n, NULL) == BIGNUM_JACOBI_ERROR_NULL_ARG);
