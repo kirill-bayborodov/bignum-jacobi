@@ -113,7 +113,16 @@ L3:
 mov	qword [rsp+136], rdi
 mov	ecx, 33
 mov	rdi, r8
-rep movsq
+cmp	qword [rsp+136], 8
+ja	Lfull_copy_reduce
+mov	ecx, 8
+rep	movsq
+mov	rax, qword [rsp+136]
+mov	qword [r8+256], rax
+jmp	L1
+Lfull_copy_reduce:
+mov	ecx, 33
+rep	movsq
 L1:
 add	rsp, 160
 pop	rbx
@@ -181,7 +190,16 @@ mov	r9, rdi
 mov	ecx, 33
 mov	rax, qword [r8+256]
 mov	rdi, rdx
-rep movsq
+cmp	rax, 8
+ja	Lfull_copy_main
+mov	ecx, 8
+rep	movsq
+mov	qword [rsp+256], rax
+jmp	Lmain_copy_done
+Lfull_copy_main:
+mov	ecx, 33
+rep	movsq
+Lmain_copy_done:
 test	rax, rax
 jne	L57
 jmp	L78
@@ -197,16 +215,33 @@ test	byte [rsp], 1
 je	L78
 lea	r13, [rsp+544]
 lea	rbp, [rsp+272]
+cmp	qword [r9+256], 8
+ja	Lwide_setup
 mov	rsi, r9
 mov	qword [rsp+256], r8
 lea	rdi, [rsp+272]
-mov	ecx, 33
+mov	ecx, 8
 mov	r12d, 1
-rep movsq
+rep	movsq
+mov	rax, qword [r9+256]
+mov	qword [rsp+528], rax
 mov	rsi, rdx
 lea	rdi, [rsp+544]
+mov	ecx, 8
+rep	movsq
+mov	rax, qword [rdx+256]
+mov	qword [rsp+800], rax
+jmp	Lsetup_done
+Lwide_setup:
+mov	rsi, r9
+mov	rdi, rbp
 mov	ecx, 33
-rep movsq
+rep	movsq
+mov	rsi, rdx
+mov	rdi, r13
+mov	ecx, 33
+rep	movsq
+Lsetup_done:
 mov	rsi, r13
 mov	rdi, rbp
 call	jacobi_reduce
@@ -289,20 +324,47 @@ neg	eax
 and	r10d, 3
 cmove	r12d, eax
 L69:
+cmp	qword [rsp+528], 8
+ja	Lwide_swap
+cmp	qword [rsp+800], 8
+ja	Lwide_swap
+mov	rsi, rbp
+lea	rdi, [rsp+816]
+mov	ecx, 8
+rep	movsq
+mov	rax, qword [rbp+256]
+mov	qword [rsp+1072], rax
+lea	rbp, [rsp+272]
+mov	rsi, r13
+mov	ecx, 8
+lea	r13, [rsp+544]
+lea	rdi, [rsp+272]
+rep	movsq
+mov	rax, qword [r13+256]
+mov	qword [rsp+528], rax
+lea	rdi, [rsp+544]
+lea	rsi, [rsp+816]
+mov	ecx, 8
+rep	movsq
+mov	rax, qword [rsp+1072]
+mov	qword [rsp+800], rax
+jmp	Lswap_done
+Lwide_swap:
 mov	rsi, rbp
 lea	rdi, [rsp+816]
 mov	ecx, 33
-rep movsq
+rep	movsq
 lea	rbp, [rsp+272]
 mov	rsi, r13
 mov	ecx, 33
 lea	r13, [rsp+544]
 lea	rdi, [rsp+272]
-rep movsq
+rep	movsq
 lea	rdi, [rsp+544]
 lea	rsi, [rsp+816]
 mov	ecx, 33
-rep movsq
+rep	movsq
+Lswap_done:
 mov	rsi, r13
 mov	rdi, rbp
 call	jacobi_reduce
